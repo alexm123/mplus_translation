@@ -1,0 +1,287 @@
+---
+title: "mplus_translation"
+format: pdf
+editor: visual
+---
+
+
+```{r}
+library(dplyr)
+library(lavaan)
+
+```
+
+You can add options to executable code like this
+
+```{r}
+d_orig <- read.fwf("C:/Users/alex/Downloads/emaildrafttohelenplusfilesfromchapter6/n7171a_1.dat", widths = c(rep(8, 3), rep(10, 9), rep(8, 
+    20)), header = FALSE)
+```
+
+```{r}
+
+names(d_orig) <- 
+  c("childID", "parentid", "s6ID", "x6read", "x6math", "x6sci", 
+    "x7read", "x7math", "x7sci", "x8read", "x8math", "x8sci",
+    "t6vic", "t6bull", "t7vic", "t7bull", "g8vic", "g8bull", "c8anx",
+    "c8lone", "c8peersu", "c8eng", "t6dist", "t7dist", "g8dist",
+    "public", "m8bully", "m8acad", "gm8bully", "gm8acad", 
+    "sd8bully" , "sd8acad"
+  )
+d <- d_orig %>% dplyr::select(s6ID, x6sci, x7sci, x8sci, t6bull)
+summary(d)
+
+```
+
+
+
+## Table 6.1 Models
+```{r}
+# This output is exactly the same as the Mplus version
+model_6_1_design_based_panel <- '
+# Regressions
+  x8sci ~ x7sci + x6sci
+  x7sci ~ x6sci
+  
+  '
+
+fit_model_6_1_design_based_panel <- 
+  lavaan::sem(
+    model = model_6_1_design_based_panel, data = d,
+    estimator = "MLR",
+    #optim.method = "em")
+    cluster = "s6ID",
+    missing = "ml")
+
+summary(fit_model_6_1_design_based_panel, 
+        fit.measures = TRUE, 
+        standardized = TRUE)
+```
+
+```{r}
+
+# Output slightly different, model does NOT converge when using missing = "ml" 
+# or "fiml"
+
+model_6_2_model_based_panel <- '
+# within group
+level: 1
+# Regressions
+  x8sci ~ x7sci + x6sci
+  x7sci ~ x6sci
+
+
+# between group
+level: 2
+# Regressions
+  x8sci ~ x7sci + x6sci
+  x7sci ~ x6sci
+'
+fit_model_6_2_model_based_panel <- 
+  lavaan::sem(
+    model = model_6_2_model_based_panel, data = d,
+    estimator = "MLR",
+    optim.method = "em",
+    cluster = "s6ID")
+
+summary(fit_model_6_2_model_based_panel, 
+        fit.measures = TRUE, 
+        standardized = TRUE)
+
+
+```
+
+```{r}
+
+model_6_3_design_based_latent_growth_model <- '
+
+  # Latent intercept and slope factors
+  i_sci =~ 1*x6sci + 1*x7sci + 1*x8sci
+  s_sci =~ 0*x6sci + 1*x7sci + 2*x8sci
+  
+  # Covariance between intercept and slope, set to 0
+  i_sci ~~ 0*s_sci
+  
+  # Set the intercepts of the observed variables to 0
+  x6sci ~ 0*1
+  x7sci ~ 0*1
+  x8sci ~ 0*1
+
+  # Free the means of the latent factors
+  i_sci ~ 1
+  s_sci ~ 1
+  
+'
+
+
+
+
+fit_model_6_3_design_based_latent_growth_model <- 
+  lavaan::sem(
+    model = model_6_3_design_based_latent_growth_model, data = d,
+    estimator = "MLR",
+    #optim.method = "em",
+    cluster = "s6ID")
+
+summary(fit_model_6_3_design_based_latent_growth_model, 
+        fit.measures = TRUE, 
+        standardized = TRUE)
+
+
+```
+
+
+
+```{r}
+
+model_6_4_design_based_latent_growth_model_with_an_estimated_loading <- '
+
+  # Latent intercept and slope factors
+  i_sci =~ 1*x6sci + 1*x7sci + 1*x8sci
+  
+  # free x7sci, let it be what it wants
+  s_sci =~ 0*x6sci + est_2 * x7sci + 2*x8sci
+  
+  # Covariance between intercept and slope, set to 0
+  i_sci ~~ 0*s_sci
+  
+  # Set the intercepts of the observed variables to 0
+  x6sci ~ 0*1
+  x7sci ~ 0*1
+  x8sci ~ 0*1
+
+  # Free the means of the latent factors
+  i_sci ~ 1
+  s_sci ~ 1
+  
+'
+
+fit_model_6_4_design_based_latent_growth_model_with_an_estimated_loading <-
+  lavaan::sem(
+    model = model_6_4_design_based_latent_growth_model_with_an_estimated_loading, 
+    data = d,
+    estimator = "MLR",
+    #optim.method = "em",
+    cluster = "s6ID")
+
+
+summary(fit_model_6_4_design_based_latent_growth_model_with_an_estimated_loading,
+        fit.measures = TRUE,
+        standardized = TRUE)
+
+```
+
+```{r}
+
+# two level model, between and within
+model_6_5_model_based_latent_growth_model_with_an_estimated_loading <- '
+
+# within group
+level: 1
+# factor loadings
+Iw_sci =~ 1 * x6sci + 1 * x7sci + 1 * x8sci
+Sw_sci =~ 0 * x6sci + est_2 * x7sci + 2 * x8sci
+
+# measured variable intercepts
+x6sci ~ 0
+x7sci ~ 0
+x8sci ~ 0
+
+# slope intercept covariance fixed to 0
+Iw_sci ~~ 0 * Sw_sci
+
+
+level: 2
+
+# between group
+# factor loadings
+Ib_sci =~ 1 * x6sci + 1 * x7sci + 1 * x8sci
+Sb_sci =~ 0 * x6sci + est_2 * x7sci + 2 * x8sci
+
+# measured variable intercepts
+x6sci ~ 0
+x7sci ~ 0
+x8sci ~ 0
+Ib_sci ~ 1
+Sb_sci ~ 1
+
+# slope intercept covariance fixed to 0
+Ib_sci ~~ 0 * Sb_sci
+'
+
+fit_model_6_5_model_based_latent_growth_model_with_an_estimated_loading <- 
+  lavaan::sem(
+    model = model_6_5_model_based_latent_growth_model_with_an_estimated_loading, 
+    data = d, 
+    estimator = "MLR",
+    optim.method = "em",
+    cluster = "s6ID")
+
+summary(fit_model_6_5_model_based_latent_growth_model_with_an_estimated_loading,
+        fit.measures = TRUE, 
+        standardized = TRUE,
+        )
+
+```
+
+```{r}
+
+model_6_6_model_based_latent_growth_model_estimated_loading_and_time_invariant_covariate <- '
+# within group
+level: 1
+# factor loadings
+Iw_sci =~ 1 * x6sci + 1 * x7sci + 1 * x8sci
+Sw_sci =~ 0 * x6sci + est_2 * x7sci + 2 * x8sci
+
+# measured variable intercepts
+x6sci ~ 0
+x7sci ~ 0
+x8sci ~ 0
+
+# slope intercept covariance fixed to 0
+Iw_sci ~~ 0 * Sw_sci
+
+# Regress iw_sci on t6bull
+Iw_sci ~ t6bull
+
+level: 2
+
+# between group
+# factor loadings
+Ib_sci =~ 1 * x6sci + 1 * x7sci + 1 * x8sci
+Sb_sci =~ 0 * x6sci + est_2 * x7sci + 2 * x8sci
+
+# measured variable intercepts
+x6sci ~ 0
+x7sci ~ 0
+x8sci ~ 0
+Ib_sci ~ 1
+Sb_sci ~ 1
+
+# slope intercept covariance fixed to 0
+Ib_sci ~~ 0 * Sb_sci
+
+# Regress iw_sci on t6bull
+Ib_sci ~ t6bull
+'
+
+fit_model_6_6_model_based_latent_growth_model_estimated_loading_and_time_invariant_covariate <-
+  lavaan::sem(
+    model = model_6_6_model_based_latent_growth_model_estimated_loading_and_time_invariant_covariate, 
+    data = d, 
+    estimator = "MLR",
+    optim.method = "em",
+    cluster = "s6ID")
+
+summary(fit_model_6_6_model_based_latent_growth_model_estimated_loading_and_time_invariant_covariate,
+        fit.measures = TRUE, 
+        standardized = TRUE,
+        )
+
+```
+
+
+
+
+
+
